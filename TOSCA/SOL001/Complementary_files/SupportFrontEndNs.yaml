@@ -1,0 +1,21 @@
+##BC This file does not exist un SOL001. It has been added to enable parsing other files importing the node type definition
+tosca_definitions_version: tosca_simple_yaml_1_3
+imports:
+  - etsi_nfv_sol001_nsd_types.yaml 
+node_types:
+  MyProviderCompany.NS.SupportFrontEndNs:
+    derived_from: tosca.nodes.nfv.NS
+    properties:
+      descriptor_id: c1bb0ab8-deab-4fa7-95ed-4840d70a3574
+      designer: MyCompany
+      name: myExample2Service
+      version: '1.0.0.0'        
+      invariant_id: aaaa-bbbb-cccc-dddd        
+      flavour_id: 
+        type: string
+        constraints: [ valid_values: [ simple, complex ] ]
+        default: simple
+    requirements:
+      - virtual_link_1:
+          capability: tosca.capabilities.nfv.VirtualLinkable
+          relationship: tosca.relationships.nfv.VirtualLinksTo

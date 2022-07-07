@@ -1,0 +1,26 @@
+##BC This file does not exist un SOL001. It has been added to enable parsing other files importing the node type definition
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml 
+  
+node_types:
+  MyCompany.VNF.FrontEnd_1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id: 5af09567-fc5f-4be9-b372-0cc431ad5c05        
+      descriptor_version: "0.2"        
+      provider: "ExampleCorp"        
+      product_name: "FrontEndProcess"        
+      software_version: "0.1"        
+      vnfm_info:  [ 'etsivnfm:v2.5.1' ]         
+      flavour_id: simple        
+      flavour_description:
+        default: "simple and unique flavour"
+    requirements:
+      - virtual_link_1:
+          capability: tosca.capabilities.nfv.VirtualLinkable
+          relationship: tosca.relationships.nfv.VirtualLinksTo
+      - virtual_link_2:
+          capability: tosca.capabilities.nfv.VirtualLinkable
+          relationship: tosca.relationships.nfv.VirtualLinksTo
