@@ -1,4 +1,7 @@
-##BC: This file does not exist in SOL001. It has been added to enable parsing other files importing the node type definition
+## This file is not part of the ETSI GS NFV-SOL 001 deliverable. 
+## It is made available for the sole purpose of enabling succesfull parsing of the example TOSCA templates
+## included in ETSI GS NFV-SOL 001 as some of them import the node type definition it contains.
+
 tosca_definitions_version: tosca_simple_yaml_1_3
 
 imports:
