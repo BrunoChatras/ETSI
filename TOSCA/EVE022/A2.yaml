@@ -1,0 +1,238 @@
+tosca_definitions_version: tosca_simple_yaml_1_3
+
+description: VNF that can be configured using K8S ConfigMap at Day-0
+imports:
+  - etsi_nfv_sol001_vnfd_types.yaml  # all of TOSCA VNFD types as defined in ETSI GS NFV-SOL 001
+
+data_types:
+
+  MyCompany.datatypes.nfv.VnfConfigurableProperties:
+    derived_from: tosca.datatypes.nfv.VnfConfigurableProperties
+    properties:
+      additional_configurable_properties:
+        type: MyCompany.datatypes.nfv.VnfAdditionalConfigurableProperties
+
+  MyCompany.datatypes.nfv.VnfAdditionalConfigurableProperties:
+    derived_from: tosca.datatypes.nfv.VnfAdditionalConfigurableProperties
+    properties:      
+      conf_prop_1: # configurable property intended to be injected in mciop_A
+        type: string
+        required: true
+        default: value_1
+      conf_prop_2: # configurable property intended to be injected in mciop_A 
+        type: string
+        required: true
+        default: value_2
+  
+  MyCompany.datatypes.nfv.VnfConfigurableParameters:
+    derived_from: tosca.datatypes.nfv.VnfConfigurableParameters
+    description: This data type models the configuration parameter values to be injected in the values.yaml files of MCIOPs.
+    properties:
+      parameter_names_in_values_yaml:
+        type: map #key is template name of the mciop to be used to convey the configurable parameter values to the CISM
+        required: true
+        entry_schema:
+          type: MyCompany.datatypes.nfv.PerMciopVnfConfigurationData
+
+  MyCompany.datatypes.nfv.PerMciopVnfConfigurationData: 
+    derived_from: tosca.datatypes.nfv.PerMciopVnfConfigurationData
+    properties: 
+      vnfConfigurableParameters: 
+        type: MyCompany.datatypes.nfv.PerMciopVnfConfigurableParameters
+        required: true
+
+  MyCompany.datatypes.nfv.PerMciopVnfConfigurableParameters: 
+    derived_from: tosca.datatypes.nfv.PerMciopVnfConfigurableParameters
+    description: This data type models the configuration parameter values to be injected in the values.yaml file of an MCIOP.
+    properties: 
+      parameter_1_name_in_values_yaml:
+        type: string
+        required: false         
+      parameter_2_name_in_values_yaml:
+        type: string
+        required: false     
+
+
+
+node_types:
+
+  MyCompany.ExampleVnf.1_0.1_0:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id: b1bb0ce7-ebca-4fa7-95ed-4840d70a1177
+      provider: MyCompany
+      product_name: ExampleVnf
+      software_version: '1.0'
+      descriptor_version: '1.0'
+      flavour_id: Simple
+      flavour_description:  “” 
+      vnfm_info: [ '0:MyCompany-1.0.0' ]   
+      configurable_properties:
+        type: MyCompany.datatypes.nfv.VnfConfigurableProperties
+        description: Describes the configurable properties of the VNF
+        required: false      
+    interfaces:
+      Vnflcm:
+        type: tosca.interfaces.nfv.Vnflcm
+        operations:
+          instantiate:
+            inputs:   
+              configurable_parameters:
+                type: MyCompany.datatypes.nfv.VnfConfigurableParameters
+                required: false
+
+          
+topology_template:
+
+  inputs: 
+    configurable_properties:
+      type: MyCompany.datatypes.nfv.VnfConfigurableProperties
+
+  substitution_mappings:
+    node_type: MyCompany.ExampleVnf.1_0.1_0 
+    requirements:
+      virtual_link: [ singleExternalCp, virtual_link ]  
+     
+
+  node_templates:
+
+    ExampleVnf:
+      type: MyCompany.ExampleVnf.1_0.1_0
+      properties:        
+        flavour_id: Simple
+        flavour_description:  A simple VNF              
+        vnfm_info: [ '0:MyCompany-1.0.0' ]  
+        configurable_properties: { get_input: configurable_properties }
+      interfaces:
+        Vnflcm: 
+          inputs: 
+            helm_chart_a: { get_artifact: [ mciop_a, vnfc_a_helm, LOCAL_FILE] }          
+            helm_chart_b: { get_artifact: [ mciop_b, vnfc_b_helm, LOCAL_FILE] }          
+          operations:
+            instantiate:
+              inputs:
+                configurable_parameters:
+                  parameter_names_in_values_yaml:
+                    mciop_a:
+                      helm_values_file_name: myvalues.yaml
+                      vnfConfigurableParameters:
+                        parameter_1_name_in_values_yaml: { get_property: [SELF, configurable_properties, additional_configurable_properties, conf_prop_1 ] }
+                    mciop_b:
+                      helm_values_file_name: myvalues.yaml
+                      vnfConfigurableParameters:
+                        parameter_2_name_in_values_yaml: { get_property: [SELF, configurable_properties, additional_configurable_properties, conf_prop_2 ] } 
+            instantiate_start:
+              implementation: k8s_day0_configuration                   
+      artifacts:
+        k8s_day0_configuration:
+          description: script to create the myvalues.yaml and make it available to the CISM, using the install command
+          type: tosca.artifacts.Implementation.Bash
+          file: scripts/k8s_config.sh  #available in the VNF package        
+
+    mciop_a:
+      type: tosca.nodes.nfv.Mciop
+      requirements:
+        - associatedVdu: VnfcA
+      artifacts:
+        vnfc_a_helm: 
+          description: Helm Chart for the single_vnfc Pod
+          type: tosca.artifacts.nfv.HelmChart
+          file: HelmCharts/vnfc_a.tgz
+
+    mciop_b:
+      type: tosca.nodes.nfv.Mciop
+      requirements:
+        - associatedVdu: VnfcB
+      artifacts:
+        vnfc_b_helm: 
+          description: Helm Chart for the single_vnfc Pod
+          type: tosca.artifacts.nfv.HelmChart
+          file: HelmCharts/vnfc_b.tgz
+
+
+
+    VnfcA:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: singleVnfc
+        description: This is VNFC-A
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 2    
+        mcio_identification_data: 
+          name: my_mcio
+          type: Deployment
+      requirements:
+        - container: VnfcA_SingleContainer
+
+
+    VnfcA_SingleContainer:
+      type: tosca.nodes.nfv.Vdu.OsContainer
+      properties:
+        name: container for VNFC A
+        description: main software
+        requested_cpu_resources: 100 # In Milli-Cpus, ie 0.1 CPU
+        cpu_resource_limit: 1000 # In Milli-Cpus, ie 1 CPU, single threaded
+        requested_memory_resources: 10 MiB
+        memory_resource_limit: 100 MiB
+      artifacts:
+        sw_image:
+          type: tosca.artifacts.nfv.SwImage
+          file: Artifacts/Images/SingleContainerImageA
+          properties:
+            name: SCI
+            version: "7.3"
+            checksum:
+              algorithm: sha-256
+              hash: a411cafee2f0f702572369da0b765e2
+            container_format: docker
+            size: "1024MB"    
+      
+    
+    singleExternalCp:
+      type: tosca.nodes.nfv.VduCp
+      properties:
+        layer_protocols: [ ipv4 ]
+        description: connection point on an external VL
+      requirements:
+        - virtual_binding: VnfcA
+        #- virtual_link: # the target node is determined in the NSD
+
+
+    VnfcB:
+      type: tosca.nodes.nfv.Vdu.OsContainerDeployableUnit
+      properties:
+        name: singleVnfc
+        description: This is VNFC-B
+        vdu_profile:
+          min_number_of_instances: 1
+          max_number_of_instances: 2    
+        mcio_identification_data: 
+          name: my_mcio
+          type: Deployment
+      requirements:
+        - container: VnfcB_SingleContainer
+
+
+    VnfcB_SingleContainer:
+      type: tosca.nodes.nfv.Vdu.OsContainer
+      properties:
+        name: container for VNFC B
+        description: main software
+        requested_cpu_resources: 100 # In Milli-Cpus, ie 0.1 CPU
+        cpu_resource_limit: 1000 # In Milli-Cpus, ie 1 CPU, single threaded
+        requested_memory_resources: 10 MiB
+        memory_resource_limit: 100 MiB
+      artifacts:
+        sw_image:
+          type: tosca.artifacts.nfv.SwImage
+          file: Artifacts/Images/SingleContainerImageB
+          properties:
+            name: SCI
+            version: "7.3"
+            checksum:
+              algorithm: sha-256
+              hash: a411cafee2f0f702572369da0b765e2
+            container_format: docker
+            size: "1024MB"    
+
